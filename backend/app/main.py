@@ -7,44 +7,13 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
-from .db import (
-    create_property_post,
-    create_social_post,
-    create_task,
-    dashboard_summary,
-    init_db,
-    list_property_posts,
-    list_social_posts,
-    list_tasks,
-    update_task,
-    upsert_notion_task,
-)
-from .models import (
-    DashboardSummary,
-    NotionSyncResult,
-    PropertyPost,
-    PropertyPostCreate,
-    SocialPost,
-    SocialPostCreate,
-    Task,
-    TaskCreate,
-    TaskPatch,
-)
+from .db import create_property_post, create_social_post, create_task, dashboard_summary, init_db, list_property_posts, list_social_posts, list_tasks, update_task, upsert_notion_task
+from .models import DashboardSummary, NotionSyncResult, PropertyPost, PropertyPostCreate, SocialPost, SocialPostCreate, Task, TaskCreate, TaskPatch
 from .notion_client import NotionClient
 
-app = FastAPI(
-    title="Notion Creator Ops Dashboard",
-    version="0.1.0",
-    description="Unified kanban and analytics dashboard for Notion tasks, SNS operations, and Facebook real-estate posting workflows.",
-)
+app = FastAPI(title="Notion Creator Ops Dashboard", version="0.1.0", description="Unified kanban and analytics dashboard for Notion tasks, SNS operations, and Facebook real-estate posting workflows.")
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 
 
 @app.on_event("startup")
@@ -89,20 +58,12 @@ async def sync_notion() -> dict:
     init_db()
     client = NotionClient()
     if not client.configured:
-        return {
-            "ok": False,
-            "imported": 0,
-            "updated": 0,
-            "skipped": 0,
-            "message": "Notion secrets are not configured. Set NOTION_API_KEY and NOTION_TASK_DATABASE_ID to enable live sync.",
-        }
-
+        return {"ok": False, "imported": 0, "updated": 0, "skipped": 0, "message": "Notion secrets are not configured. Set NOTION_API_KEY and NOTION_TASK_DATABASE_ID to enable live sync."}
     imported = 0
     updated = 0
     skipped = 0
     try:
-        notion_tasks = await client.fetch_tasks()
-        for task in notion_tasks:
+        for task in await client.fetch_tasks():
             try:
                 result = upsert_notion_task(task)
                 imported += int(result == "imported")
@@ -111,14 +72,7 @@ async def sync_notion() -> dict:
                 skipped += 1
     except httpx.HTTPError as exc:
         raise HTTPException(status_code=502, detail=f"Notion API request failed: {exc}") from exc
-
-    return {
-        "ok": True,
-        "imported": imported,
-        "updated": updated,
-        "skipped": skipped,
-        "message": f"Synced {imported + updated} Notion tasks.",
-    }
+    return {"ok": True, "imported": imported, "updated": updated, "skipped": skipped, "message": f"Synced {imported + updated} Notion tasks."}
 
 
 @app.get("/api/social-posts", response_model=list[SocialPost])
