@@ -1,0 +1,13 @@
+name = "notion-creator-ops-dashboard"
+pages_build_output_dir = "dist"
+compatibility_date = "2026-06-30"
+
+[vars]
+NOTION_VERSION = "2022-06-28"
+NOTION_PROP_TITLE = "Name"
+NOTION_PROP_STATUS = "Status"
+NOTION_PROP_PRIORITY = "Priority"
+NOTION_PROP_DUE_DATE = "Due Date"
+NOTION_PROP_PROJECT = "Project"
+NOTION_PROP_CHANNEL = "Channel"
+NOTION_PROP_PROGRESS = "Progress"
