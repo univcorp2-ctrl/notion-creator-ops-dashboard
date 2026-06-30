@@ -1,0 +1,59 @@
+name: Deploy to Cloudflare Pages
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'frontend/**'
+      - '.github/workflows/deploy-cloudflare.yml'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      CLOUDFLARE_PROJECT_NAME: notion-creator-ops-dashboard
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Detect Cloudflare secrets
+        id: secrets
+        shell: bash
+        run: |
+          if [ -n "$CLOUDFLARE_API_TOKEN" ] && [ -n "$CLOUDFLARE_ACCOUNT_ID" ]; then
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            echo "Cloudflare secrets are not configured. Skipping deployment without failing CI."
+          fi
+
+      - name: Set up Node.js
+        if: steps.secrets.outputs.configured == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install frontend dependencies
+        if: steps.secrets.outputs.configured == 'true'
+        run: npm install --prefix frontend
+
+      - name: Build frontend
+        if: steps.secrets.outputs.configured == 'true'
+        run: npm run build --prefix frontend
+
+      - name: Deploy frontend and API functions to Cloudflare Pages
+        if: steps.secrets.outputs.configured == 'true'
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: pages deploy frontend/dist --project-name=notion-creator-ops-dashboard --branch=main
+
+      - name: Production URL
+        if: steps.secrets.outputs.configured == 'true'
+        run: |
+          echo "Production URL: https://notion-creator-ops-dashboard.pages.dev" >> "$GITHUB_STEP_SUMMARY"
+          echo "API Health: https://notion-creator-ops-dashboard.pages.dev/api/health" >> "$GITHUB_STEP_SUMMARY"
