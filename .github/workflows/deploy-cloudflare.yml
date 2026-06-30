@@ -46,11 +46,10 @@ jobs:
 
       - name: Deploy frontend and API functions to Cloudflare Pages
         if: steps.secrets.outputs.configured == 'true'
-        uses: cloudflare/wrangler-action@v3
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: pages deploy frontend/dist --project-name=notion-creator-ops-dashboard --branch=main
+        working-directory: frontend
+        run: |
+          # Run Wrangler from the Pages project root so frontend/functions is uploaded.
+          npx wrangler@latest pages deploy dist --project-name="$CLOUDFLARE_PROJECT_NAME" --branch=main
 
       - name: Production URL
         if: steps.secrets.outputs.configured == 'true'
