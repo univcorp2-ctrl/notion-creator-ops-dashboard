@@ -24,7 +24,6 @@ def _read_title(properties: dict[str, Any], name: str) -> str:
     value = properties.get(name)
     if value and value.get("type") == "title":
         return _plain_text(value.get("title")) or "Untitled"
-
     for prop in properties.values():
         if prop.get("type") == "title":
             return _plain_text(prop.get("title")) or "Untitled"
@@ -35,7 +34,6 @@ def _read_select_like(properties: dict[str, Any], name: str, fallback: str = "")
     value = properties.get(name)
     if not value:
         return fallback
-
     prop_type = value.get("type")
     if prop_type in {"select", "status"}:
         selected = value.get(prop_type)
@@ -87,23 +85,8 @@ def normalize_priority(value: str) -> str:
 
 
 def normalize_channel(value: str) -> str:
-    normalized = value.strip().lower()
-    mapping = {
-        "sns": "SNS",
-        "x": "SNS",
-        "threads": "SNS",
-        "blog": "Blog",
-        "ブログ": "Blog",
-        "lp": "Landing Page",
-        "landing page": "Landing Page",
-        "開発": "Development",
-        "development": "Development",
-        "不動産": "Real Estate",
-        "real estate": "Real Estate",
-        "research": "Research",
-        "調査": "Research",
-    }
-    return mapping.get(normalized, "Operations")
+    mapping = {"sns": "SNS", "x": "SNS", "threads": "SNS", "blog": "Blog", "ブログ": "Blog", "lp": "Landing Page", "landing page": "Landing Page", "開発": "Development", "development": "Development", "不動産": "Real Estate", "real estate": "Real Estate", "research": "Research", "調査": "Research"}
+    return mapping.get(value.strip().lower(), "Operations")
 
 
 class NotionClient:
@@ -119,58 +102,30 @@ class NotionClient:
     def _headers(self) -> dict[str, str]:
         if not self.api_key:
             raise RuntimeError("NOTION_API_KEY is not configured")
-        return {
-            "Authorization": f"Bearer {self.api_key}",
-            "Notion-Version": self.version,
-            "Content-Type": "application/json",
-        }
+        return {"Authorization": f"Bearer {self.api_key}", "Notion-Version": self.version, "Content-Type": "application/json"}
 
     async def fetch_tasks(self) -> list[TaskCreate]:
         if not self.database_id:
             raise RuntimeError("NOTION_TASK_DATABASE_ID is not configured")
-
-        payload = {
-            "page_size": 100,
-            "sorts": [
-                {"property": _property_name("NOTION_PROP_DUE_DATE", "Due Date"), "direction": "ascending"}
-            ],
-        }
-
+        payload = {"page_size": 100, "sorts": [{"property": _property_name("NOTION_PROP_DUE_DATE", "Due Date"), "direction": "ascending"}]}
         async with httpx.AsyncClient(timeout=20) as client:
-            response = await client.post(
-                f"{NOTION_API_BASE}/data_sources/{self.database_id}/query",
-                headers=self._headers(),
-                json=payload,
-            )
+            response = await client.post(f"{NOTION_API_BASE}/data_sources/{self.database_id}/query", headers=self._headers(), json=payload)
             if response.status_code == 404:
-                response = await client.post(
-                    f"{NOTION_API_BASE}/databases/{self.database_id}/query",
-                    headers=self._headers(),
-                    json=payload,
-                )
+                response = await client.post(f"{NOTION_API_BASE}/databases/{self.database_id}/query", headers=self._headers(), json=payload)
             response.raise_for_status()
             data = response.json()
-
         return [self._page_to_task(page) for page in data.get("results", [])]
 
     def _page_to_task(self, page: dict[str, Any]) -> TaskCreate:
         properties = page.get("properties", {})
-        title = _read_title(properties, _property_name("NOTION_PROP_TITLE", "Name"))
-        status = normalize_status(_read_select_like(properties, _property_name("NOTION_PROP_STATUS", "Status"), "todo"))
-        priority = normalize_priority(_read_select_like(properties, _property_name("NOTION_PROP_PRIORITY", "Priority"), "medium"))
-        channel = normalize_channel(_read_select_like(properties, _property_name("NOTION_PROP_CHANNEL", "Channel"), "Operations"))
-        project = _read_select_like(properties, _property_name("NOTION_PROP_PROJECT", "Project"), "Inbox") or "Inbox"
-        due_date = _read_date(properties, _property_name("NOTION_PROP_DUE_DATE", "Due Date"))
-        progress = _read_number(properties, _property_name("NOTION_PROP_PROGRESS", "Progress"), 0)
-
         return TaskCreate(
-            title=title,
-            project=project,
-            status=status,  # type: ignore[arg-type]
-            priority=priority,  # type: ignore[arg-type]
-            due_date=due_date,
-            channel=channel,  # type: ignore[arg-type]
-            progress=progress,
+            title=_read_title(properties, _property_name("NOTION_PROP_TITLE", "Name")),
+            project=_read_select_like(properties, _property_name("NOTION_PROP_PROJECT", "Project"), "Inbox") or "Inbox",
+            status=normalize_status(_read_select_like(properties, _property_name("NOTION_PROP_STATUS", "Status"), "todo")),  # type: ignore[arg-type]
+            priority=normalize_priority(_read_select_like(properties, _property_name("NOTION_PROP_PRIORITY", "Priority"), "medium")),  # type: ignore[arg-type]
+            due_date=_read_date(properties, _property_name("NOTION_PROP_DUE_DATE", "Due Date")),
+            channel=normalize_channel(_read_select_like(properties, _property_name("NOTION_PROP_CHANNEL", "Channel"), "Operations")),  # type: ignore[arg-type]
+            progress=_read_number(properties, _property_name("NOTION_PROP_PROGRESS", "Progress"), 0),
             source="notion",
             external_url=page.get("url"),
             notion_page_id=page.get("id"),
