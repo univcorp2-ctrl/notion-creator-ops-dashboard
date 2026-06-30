@@ -11,6 +11,7 @@ node_modules/
 frontend/dist/
 frontend/.vite/
 npm-debug.log*
+package-lock.json
 
 # App data
 data/*.sqlite3
